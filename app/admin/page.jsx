@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Table, Select, message, Card, Row, Col } from "antd";
+import { Table, Select, message, Card, Row, Col, Input } from "antd";
 import {
   PieChart,
   Pie,
@@ -19,6 +19,11 @@ export default function AdminDashboard() {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [searchName, setSearchName] = useState("");
+  const [sortOrder, setSortOrder] = useState("DESC");
+  const [sortBy, setSortBy] = useState("created_at");
+  const [searchTyping, setSearchTyping] = useState(false);
+  const [searchDebounceId, setSearchDebounceId] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [updatingStatus, setUpdatingStatus] = useState({}); // Track which submission is being updated
   const [refreshing, setRefreshing] = useState(false); // Track refresh loading state
@@ -43,6 +48,14 @@ export default function AdminDashboard() {
     setTimeout(checkAuth, 100);
   }, [router]);
 
+  // Refetch when search/sort changes
+  useEffect(() => {
+    if (!loading && !searchTyping) {
+      fetchSubmissions(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortOrder, sortBy, searchTyping]);
+
   const fetchSubmissions = async (showLoading = false) => {
     if (showLoading) {
       setRefreshing(true);
@@ -55,26 +68,33 @@ export default function AdminDashboard() {
       const forceRefresh = Date.now();
       const cacheBuster = Math.random().toString(36).substring(7);
 
-      const response = await fetch(
-        `/api/admin/submissions?t=${timestamp}&r=${random}&force=${forceRefresh}&cb=${cacheBuster}&_=${Date.now()}`,
-        {
-          headers: {
-            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
-            Pragma: "no-cache",
-            "X-Requested-With": "XMLHttpRequest",
-            "X-Force-Refresh": "true",
-            "X-Cache-Buster": `${timestamp}-${random}`,
-            "X-Request-Time": `${Date.now()}`,
-          },
-          // Force fresh request
-          cache: "no-store",
-        }
-      );
+      const params = new URLSearchParams({
+        name: searchName,
+        sort_by: sortBy,
+        order: sortOrder,
+        t: String(timestamp),
+        r: random,
+        force: String(forceRefresh),
+        cb: cacheBuster,
+        _: String(Date.now()),
+      });
+
+      const response = await fetch(`/api/submissions/search?${params.toString()}`, {
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+          Pragma: "no-cache",
+          "X-Requested-With": "XMLHttpRequest",
+          "X-Force-Refresh": "true",
+          "X-Cache-Buster": `${timestamp}-${random}`,
+          "X-Request-Time": `${Date.now()}`,
+        },
+        cache: "no-store",
+      });
       const data = await response.json();
 
-      if (response.ok) {
-        setSubmissions(data);
-        updateChartData(data);
+      if (response.ok && data && data.success) {
+        setSubmissions(data.data || []);
+        updateChartData(data.data || []);
         if (showLoading) {
           message.success("Data berhasil diperbarui");
         }
@@ -738,23 +758,64 @@ export default function AdminDashboard() {
 
         {/* Table */}
         <Card title="Daftar Pengajuan">
-          <div className="mb-4">
-            <Select
-              value={statusFilter}
-              onChange={setStatusFilter}
-              style={{ width: "100%", maxWidth: 200 }}
-              placeholder="Filter by status"
-              disabled={loading || Object.values(updatingStatus).some(Boolean)}
-              loading={loading}
-            >
-              <Option value="ALL">Semua Status</Option>
-              <Option value="PENGAJUAN_BARU">Pengajuan Baru</Option>
-              <Option value="DIPROSES">Sedang Diproses</Option>
-              <Option value="SELESAI">Selesai</Option>
-              <Option value="DITOLAK">Ditolak</Option>
-            </Select>
+          <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 items-center">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Filter Status</label>
+              <Select
+                value={statusFilter}
+                onChange={setStatusFilter}
+                style={{ width: "100%", maxWidth: 200 }}
+                placeholder="Filter by status"
+                disabled={loading || Object.values(updatingStatus).some(Boolean)}
+                loading={loading}
+              >
+                <Option value="ALL">Semua Status</Option>
+                <Option value="PENGAJUAN_BARU">Pengajuan Baru</Option>
+                <Option value="DIPROSES">Sedang Diproses</Option>
+                <Option value="SELESAI">Selesai</Option>
+                <Option value="DITOLAK">Ditolak</Option>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Cari Nama</label>
+              <Input
+                allowClear
+                placeholder="Ketik nama..."
+                value={searchName}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearchName(val);
+                  setSearchTyping(true);
+                  if (searchDebounceId) {
+                    clearTimeout(searchDebounceId);
+                  }
+                  const id = setTimeout(() => {
+                    setSearchTyping(false);
+                    fetchSubmissions(false);
+                  }, 400);
+                  setSearchDebounceId(id);
+                }}
+                onPressEnter={() => fetchSubmissions(true)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Urutkan</label>
+              <div className="flex gap-2">
+                <Select value={sortBy} onChange={setSortBy} style={{ minWidth: 140 }}>
+                  <Option value="created_at">Tanggal dibuat</Option>
+                  <Option value="status">Status</Option>
+                </Select>
+                <Select value={sortOrder} onChange={setSortOrder} style={{ minWidth: 120 }}>
+                  <Option value="DESC">DESC</Option>
+                  <Option value="ASC">ASC</Option>
+                </Select>
+              </div>
+            </div>
+
             {loading && (
-              <span className="ml-2 text-xs sm:text-sm text-gray-500">
+              <span className="sm:col-span-3 text-xs sm:text-sm text-gray-500">
                 Memuat data...
               </span>
             )}

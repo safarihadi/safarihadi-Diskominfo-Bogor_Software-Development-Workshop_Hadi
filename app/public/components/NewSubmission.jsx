@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
 
 // Phone number formatting function
 const formatPhoneNumber = (phone) => {
@@ -29,76 +30,28 @@ const formatPhoneNumber = (phone) => {
 
 export default function NewSubmission() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    nama: "",
-    nik: "",
-    email: "",
-    no_wa: "",
-    jenis_layanan: "",
-    consent: false,
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm({
+    mode: "onChange",
+    defaultValues: {
+      nama: "",
+      nik: "",
+      email: "",
+      no_wa: "",
+      jenis_layanan: "",
+      consent: false,
+    },
   });
-  const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.nama.trim()) {
-      newErrors.nama = "Nama wajib diisi";
-    }
-
-    if (!formData.nik.trim()) {
-      newErrors.nik = "NIK wajib diisi";
-    } else if (formData.nik.length !== 16) {
-      newErrors.nik = "NIK harus 16 digit";
-    } else if (!/^\d+$/.test(formData.nik)) {
-      newErrors.nik = "NIK hanya boleh berisi angka";
-    }
-
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Format email tidak valid";
-    }
-
-    if (!formData.no_wa.trim()) {
-      newErrors.no_wa = "Nomor WhatsApp wajib diisi";
-    }
-
-    if (!formData.jenis_layanan) {
-      newErrors.jenis_layanan = "Jenis layanan wajib dipilih";
-    }
-
-    if (!formData.consent) {
-      newErrors.consent = "Anda harus menyetujui pemberian notifikasi";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!validateForm()) return;
-
-    setIsSubmitting(true);
-
+  const onSubmit = async (values) => {
     try {
-      // Format phone number to +62 format before sending
-      const formattedData = {
-        ...formData,
-        no_wa: formatPhoneNumber(formData.no_wa),
+      const payload = {
+        ...values,
+        no_wa: formatPhoneNumber(values.no_wa),
       };
 
       const response = await fetch("/api/submissions", {
@@ -106,23 +59,21 @@ export default function NewSubmission() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formattedData),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        // Redirect to success page with tracking code
+        reset();
         router.push(`/public/success?tracking_code=${result.tracking_code}`);
       } else {
-        setErrors({
-          submit: result.message || "Terjadi kesalahan saat mengirim pengajuan",
-        });
+        // eslint-disable-next-line no-console
+        console.error(result);
       }
     } catch (error) {
-      setErrors({ submit: "Terjadi kesalahan jaringan" });
-    } finally {
-      setIsSubmitting(false);
+      // eslint-disable-next-line no-console
+      console.error(error);
     }
   };
 
@@ -132,7 +83,7 @@ export default function NewSubmission() {
         Form Pengajuan Layanan
       </h2>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Nama */}
         <div>
           <label
@@ -144,16 +95,14 @@ export default function NewSubmission() {
           <input
             type="text"
             id="nama"
-            name="nama"
-            value={formData.nama}
-            onChange={handleChange}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black ${
               errors.nama ? "border-red-500" : "border-gray-300"
             }`}
             placeholder="Masukkan nama lengkap"
+            {...register("nama", { required: "Nama Lengkap wajib diisi" })}
           />
           {errors.nama && (
-            <p className="mt-1 text-sm text-red-600">{errors.nama}</p>
+            <p className="mt-1 text-sm text-red-600">{errors.nama.message}</p>
           )}
         </div>
 
@@ -168,17 +117,26 @@ export default function NewSubmission() {
           <input
             type="text"
             id="nik"
-            name="nik"
-            value={formData.nik}
-            onChange={handleChange}
+            inputMode="numeric"
             maxLength={16}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black ${
               errors.nik ? "border-red-500" : "border-gray-300"
             }`}
             placeholder="Masukkan 16 digit NIK"
+            {...register("nik", {
+              required: "NIK wajib diisi",
+              pattern: { value: /^\d{16}$/, message: "NIK harus 16 digit angka" },
+            })}
+            onInput={(e) => {
+              // Hanya izinkan angka dan batasi 16 digit
+              const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 16);
+              if (e.target.value !== digitsOnly) {
+                e.target.value = digitsOnly;
+              }
+            }}
           />
           {errors.nik && (
-            <p className="mt-1 text-sm text-red-600">{errors.nik}</p>
+            <p className="mt-1 text-sm text-red-600">{errors.nik.message}</p>
           )}
         </div>
 
@@ -193,16 +151,20 @@ export default function NewSubmission() {
           <input
             type="email"
             id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black ${
               errors.email ? "border-red-500" : "border-gray-300"
             }`}
             placeholder="contoh@email.com"
+            {...register("email", {
+              required: "Email wajib diisi",
+              pattern: {
+                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                message: "Format email tidak valid",
+              },
+            })}
           />
           {errors.email && (
-            <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+            <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
           )}
         </div>
 
@@ -217,16 +179,28 @@ export default function NewSubmission() {
           <input
             type="tel"
             id="no_wa"
-            name="no_wa"
-            value={formData.no_wa}
-            onChange={handleChange}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black ${
               errors.no_wa ? "border-red-500" : "border-gray-300"
             }`}
-            placeholder="08xxxxxxxxxx (akan diformat ke +62...)"
+            placeholder="+62812XXXXXXX"
+            {...register("no_wa", {
+              required: "Nomor WhatsApp wajib diisi",
+              pattern: {
+                value: /^\+62\d{8,12}$/,
+                message:
+                  "Nomor WA harus diawali +62 dan hanya angka (min 11 digit total)",
+              },
+            })}
+            onInput={(e) => {
+              // Izinkan hanya angka dan tanda + (satu '+' hanya di awal)
+              let v = e.target.value.replace(/[^+\d]/g, "");
+              // Hapus semua '+' selain yang pertama di awal
+              v = v.replace(/(?!^)\+/g, "");
+              e.target.value = v;
+            }}
           />
           {errors.no_wa && (
-            <p className="mt-1 text-sm text-red-600">{errors.no_wa}</p>
+            <p className="mt-1 text-sm text-red-600">{errors.no_wa.message}</p>
           )}
         </div>
 
@@ -240,12 +214,11 @@ export default function NewSubmission() {
           </label>
           <select
             id="jenis_layanan"
-            name="jenis_layanan"
-            value={formData.jenis_layanan}
-            onChange={handleChange}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black ${
               errors.jenis_layanan ? "border-red-500" : "border-gray-300"
             }`}
+            defaultValue=""
+            {...register("jenis_layanan", { required: "Jenis Layanan wajib dipilih" })}
           >
             <option value="">Pilih jenis layanan</option>
             <option value="KTP">Pembuatan KTP</option>
@@ -256,7 +229,7 @@ export default function NewSubmission() {
             <option value="SURAT_KETERANGAN">Surat Keterangan</option>
           </select>
           {errors.jenis_layanan && (
-            <p className="mt-1 text-sm text-red-600">{errors.jenis_layanan}</p>
+            <p className="mt-1 text-sm text-red-600">{errors.jenis_layanan.message}</p>
           )}
         </div>
 
@@ -265,11 +238,9 @@ export default function NewSubmission() {
           <div className="flex items-center h-5">
             <input
               id="consent"
-              name="consent"
               type="checkbox"
-              checked={formData.consent}
-              onChange={handleChange}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              {...register("consent", { required: "Anda harus menyetujui pemberian notifikasi" })}
             />
           </div>
           <div className="ml-3 text-sm">
@@ -278,17 +249,13 @@ export default function NewSubmission() {
               WhatsApp dan email
             </label>
             {errors.consent && (
-              <p className="mt-1 text-red-600">{errors.consent}</p>
+              <p className="mt-1 text-red-600">{errors.consent.message}</p>
             )}
           </div>
         </div>
 
         {/* Submit Error */}
-        {errors.submit && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-600">{errors.submit}</p>
-          </div>
-        )}
+        {/* Submit error handled via notifications or console in this example */}
 
         {/* Submit Button */}
         <button

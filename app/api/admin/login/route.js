@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Admin, initializeDatabase } from "@/lib/sequelize";
+import { sequelize, Admin, initializeDatabase } from "@/lib/sequelize";
 import bcrypt from "bcryptjs";
 
 let dbInitialized = false;
@@ -15,27 +15,28 @@ export async function POST(request) {
   try {
     await initDB();
 
-    const { username, password } = await request.json();
+    const { email, password } = await request.json();
 
     // Validate input
-    if (!username || !password) {
+    if (!email || !password) {
       return NextResponse.json(
-        { error: "Username dan password wajib diisi" },
+        { error: "Email dan password wajib diisi" },
         { status: 400 }
       );
     }
 
-    // Find admin by username
+    // Find admin by email (case-insensitive); do not hard-filter is_active to avoid NULL mismatch
     const admin = await Admin.findOne({
-      where: {
-        username: username,
-        is_active: true,
-      },
+      where: sequelize.where(
+        sequelize.fn("LOWER", sequelize.col("email")),
+        email.toLowerCase()
+      ),
+      attributes: ["username", "password", "email"],
     });
 
     if (!admin) {
       return NextResponse.json(
-        { error: "Username atau password salah" },
+        { error: "Email atau password salah" },
         { status: 401 }
       );
     }
@@ -56,7 +57,7 @@ export async function POST(request) {
 
     if (!isPasswordValid) {
       return NextResponse.json(
-        { error: "Username atau password salah" },
+        { error: "Email atau password salah" },
         { status: 401 }
       );
     }
@@ -65,8 +66,6 @@ export async function POST(request) {
     const adminData = {
       username: admin.username,
       email: admin.email,
-      role: admin.role,
-      is_active: admin.is_active,
     };
 
     return NextResponse.json({

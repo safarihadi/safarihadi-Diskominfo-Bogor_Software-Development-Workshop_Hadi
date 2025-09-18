@@ -7,7 +7,7 @@ import { message } from "antd";
 export default function AdminLogin() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    username: "",
+    email: "",
     password: "",
   });
   const [errors, setErrors] = useState({});
@@ -27,8 +27,8 @@ export default function AdminLogin() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.username || !formData.password) {
-      setErrors({ submit: "Username dan password wajib diisi" });
+    if (!formData.email || !formData.password) {
+      setErrors({ submit: "Email dan password wajib diisi" });
       return;
     }
 
@@ -66,7 +66,7 @@ export default function AdminLogin() {
           router.push("/admin");
         }, 1000);
       } else {
-        setErrors({ submit: data.error || "Username atau password salah" });
+        setErrors({ submit: data.error || "Email atau password salah" });
         setIsSubmitting(false); // Reset loading state on error
       }
     } catch (error) {
@@ -92,19 +92,19 @@ export default function AdminLogin() {
           
           <div>
             <label
-              htmlFor="username"
+              htmlFor="email"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Username
+              Email
             </label>
             <input
-              type="text"
-              id="username"
-              name="username"
-              value={formData.username}
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black transition duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Masukkan username"
+              placeholder="Masukkan email"
             />
           </div>
 
@@ -163,7 +163,7 @@ export default function AdminLogin() {
 
         <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800">
-            <strong>Demo:</strong> Username: admin, Password: admin123
+            <strong>Demo:</strong> Email: admin@bogor.go.id, Password: admin123
           </p>
           <p className="text-xs text-yellow-700 mt-1">
             Data admin tersimpan di database PostgreSQL
