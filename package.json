@@ -11,12 +11,14 @@
     "postinstall": "npm rebuild pg pg-hstore",
     "vercel-build": "npm run build",
     "init-db": "node scripts/init-db.js",
+    "create-admin": "node scripts/create-admin.js",
     "test-twilio": "node scripts/test-twilio.js",
     "test-email": "node scripts/test-email.js"
   },
   "dependencies": {
     "antd": "^5.12.8",
     "autoprefixer": "^10.0.1",
+    "bcryptjs": "3.0.2",
     "critters": "^0.0.20",
     "dotenv": "^16.6.1",
     "next": "14.2.32",
