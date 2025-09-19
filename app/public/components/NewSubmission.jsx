@@ -8,24 +8,21 @@ import { useForm } from "react-hook-form";
 const formatPhoneNumber = (phone) => {
   if (!phone) return "";
 
-  // Remove all non-digit characters
-  let cleaned = phone.replace(/\D/g, "");
+  // Remove all non-digit characters except +
+  let cleaned = phone.replace(/[^\d+]/g, "");
 
-  // Remove leading zeros
-  cleaned = cleaned.replace(/^0+/, "");
-
-  // If it starts with 62, it's already in international format
-  if (cleaned.startsWith("62")) {
-    return `+${cleaned}`;
+  // If it already starts with +, return as is
+  if (cleaned.startsWith("+")) {
+    return cleaned;
   }
 
-  // For Indonesian mobile numbers, add 62
-  if (cleaned.length >= 8 && cleaned.length <= 13) {
-    return `+62${cleaned}`;
+  // If it starts with 0, remove the leading zero
+  if (cleaned.startsWith("0")) {
+    cleaned = cleaned.substring(1);
   }
 
-  // Default: assume it's a mobile number and add 62
-  return `+62${cleaned}`;
+  // Return the cleaned number without forcing +62
+  return cleaned;
 };
 
 export default function NewSubmission() {
@@ -182,18 +179,17 @@ export default function NewSubmission() {
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black ${
               errors.no_wa ? "border-red-500" : "border-gray-300"
             }`}
-            placeholder="+62812XXXXXXX"
+            placeholder="0812XXXXXXX atau +62812XXXXXXX"
             {...register("no_wa", {
               required: "Nomor WhatsApp wajib diisi",
               pattern: {
-                value: /^\+62\d{8,12}$/,
-                message:
-                  "Nomor WA harus diawali +62 dan hanya angka (min 11 digit total)",
+                value: /^[\+]?[\d\s\-\(\)]{8,15}$/,
+                message: "Format nomor WhatsApp tidak valid (8-15 digit)",
               },
             })}
             onInput={(e) => {
-              // Izinkan hanya angka dan tanda + (satu '+' hanya di awal)
-              let v = e.target.value.replace(/[^+\d]/g, "");
+              // Izinkan hanya angka, +, spasi, -, dan ()
+              let v = e.target.value.replace(/[^\d+\s\-\(\)]/g, "");
               // Hapus semua '+' selain yang pertama di awal
               v = v.replace(/(?!^)\+/g, "");
               e.target.value = v;
